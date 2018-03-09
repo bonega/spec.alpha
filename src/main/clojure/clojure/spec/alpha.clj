@@ -931,12 +931,18 @@
                                    (gen/fmap
                                     #(tag % k)
                                     (gensub p overrides (conj path k) rmap (list 'method form k))))))))
-                      gs (->> (methods @mmvar)
-                              (remove (fn [[k]] (invalid? k)))
-                              (map gen)
-                              (remove nil?))]
+                      mgs (reduce-kv (fn [m k v]
+                                      (if (invalid? k)
+                                        m
+                                        (if-let [vgen (gen [k v])]
+                                          (assoc m k vgen)
+                                          m)))
+                                     {} (methods @mmvar))
+                      gs (vals mgs)]
                   (when (every? identity gs)
-                    (gen/one-of gs)))))
+                    (if-let [dispatch-gen (get overrides (.dispatchFn @mmvar) nil)]
+                      (gen/bind (dispatch-gen) (partial get mgs))
+                      (gen/one-of gs))))))
         (with-gen* [_ gfn] (multi-spec-impl form mmvar retag gfn))
         (describe* [_] `(multi-spec ~form ~retag))))))
 
